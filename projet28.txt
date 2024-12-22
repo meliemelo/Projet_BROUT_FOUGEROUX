@@ -1,0 +1,139 @@
+import matplotlib.pyplot as plt
+import pandas as pd
+import math
+import os
+
+# Create directories for output files and images
+os.makedirs("images", exist_ok=True)  # Creates a folder "images" if it doesn't already exist
+
+def read_file_to_dataframe(file):
+# Reads data from a CSV file into a pandas DataFrame.
+#Cleans and processes necessary columns and returns the DataFrame.
+    try:
+        # Read the CSV file using ";" as a delimiter
+        df = pd.read_csv(file, sep=";")
+        
+        # Replace commas with periods in the column "counts_live_bacteria_per_wet_g" if it contains strings
+        if df["counts_live_bacteria_per_wet_g"].dtype == 'object':
+            df["counts_live_bacteria_per_wet_g"] = df["counts_live_bacteria_per_wet_g"].str.replace(',', '.')
+
+        # Convert the values to float, ignoring any errors
+        df["counts_live_bacteria_per_wet_g"] = pd.to_numeric(df["counts_live_bacteria_per_wet_g"], errors='coerce')
+
+        # Remove rows with missing values after the conversion
+        df = df.dropna(subset=["counts_live_bacteria_per_wet_g"])
+
+        # Apply a logarithmic transformation (log10) to the values for analysis
+        df["counts_live_bacteria_per_wet_g"] = df["counts_live_bacteria_per_wet_g"].apply(lambda x: math.log10(x))
+        return df  # Return the cleaned DataFrame
+
+    except Exception as erreur:
+        # Catch and display any errors encountered during reading or processing
+        print(f"Error reading the file: {erreur}")
+        return None  # Return None if an error occurred
+
+def plot_fecal_graph(df):
+#Plots a line graph with a distinct line for each mouse.
+#The lines are colored based on the treatment (ABX or Placebo).
+
+    # Filter the data for the "fecal" sample type
+    line_chart = df[df["sample_type"] == "fecal"][["mouse_ID", "treatment", "experimental_day", "counts_live_bacteria_per_wet_g"]]
+
+    # Initialize the graph with a custom size
+    plt.figure(figsize=(11, 4))
+    
+    # Plot a line for each mouse
+    for mouse_id in line_chart["mouse_ID"].unique():
+        # Get the data associated with a specific mouse
+        mouse = line_chart[line_chart["mouse_ID"] == mouse_id]
+        
+        # Determine the line color based on the treatment
+        treatment = mouse["treatment"].iloc[0]
+        color = "orange" if treatment == "ABX" else "blue"
+
+        # Plot the line for the mouse with transparency for readability
+        plt.plot(
+            mouse["experimental_day"],  # X-axis: experimental days
+            mouse["counts_live_bacteria_per_wet_g"],  # Y-axis: live bacteria (log10)
+            label=f"Mouse {mouse_id} ({treatment})",  # Legend for each mouse
+            color=color,
+            alpha=0.7  # Transparency
+        )
+
+    # Add title and axis labels
+    plt.title('Fecal live bacteria', fontsize=10)
+    plt.xlabel('Washout day', fontsize=10)
+    plt.ylabel('log10(Live bacteria/wet g)', fontsize=10)
+    plt.yscale("log")  # Set the Y-axis to logarithmic scale
+    plt.legend(bbox_to_anchor=(1.0, 1), loc='best', fontsize=10)  # Legend position
+    plt.grid(True)  # Add a grid for readability
+    plt.tight_layout()  # Automatically adjust margins to avoid overlaps
+
+    # Save and display the graph
+    plt.savefig('images/fecal_live_bacteria_line_chart.png', dpi=300)  # Save to the "images" folder
+    plt.show()  # Display the graph
+    plt.close()  # Close the graph to free up memory
+    plt.show()
+
+def plot_cecal_ileal_graph(data, title, file_name):
+#Plots a violin plot for cecal or ileal data.
+#each group (ABX or Placebo) has a specific color.
+
+    # Initialize a figure and axes for the plot
+    figure, axes = plt.subplots()
+    axes.set_title(title)  # Add a title
+    axes.set_xlabel('Treatment')  # X-axis label
+    axes.set_ylabel('Log10(Number of Bacteria)')  # Y-axis label
+
+    # Separate data based on treatments ABX and Placebo
+    yVal_ABX = [row["counts_live_bacteria_per_wet_g"] for _, row in data.iterrows() if row["treatment"] == "ABX"]
+    yVal_Placebo = [row["counts_live_bacteria_per_wet_g"] for _, row in data.iterrows() if row["treatment"].lower() == "placebo"]
+
+    # Check if both groups have sufficient data
+    if not yVal_ABX or not yVal_Placebo:
+        print(f"Insufficient data to plot the graph {title}.")
+        return
+
+    # Plot the data as a violin plot
+    parts = axes.violinplot([yVal_ABX, yVal_Placebo], [1, 2], showmeans=True)
+
+    # Apply colors to the violins
+    for i, pc in enumerate(parts['bodies']):
+        if i == 0:  # First group (ABX)
+            pc.set_facecolor("orange")
+        elif i == 1:  # Second group (Placebo)
+            pc.set_facecolor("blue")
+        pc.set_alpha(0.7)  # Transparency for readability
+
+    # Customize the colors of other parts of the violins
+    for key in ['cbars', 'cmins', 'cmaxes', 'cmeans']:
+        if key in parts:
+            parts[key].set_edgecolor(['orange', 'blue'])  # Apply colors
+            parts[key].set_linewidth(1.5)  # Adjust line thickness
+
+    # Add labels for the X-axis
+    axes.set_xticks([1, 2])
+    axes.set_xticklabels(['ABX', 'Placebo'])
+    plt.grid(axis="y")  # Add a vertical grid
+
+    # Save and display the graph
+    plt.savefig(f"images/{file_name}")  # Save to the "images" folder
+    plt.show()  # Display the graph
+
+# Load the data
+data_file = "data_real.csv"  # Replace with the correct path to your file
+df = read_file_to_dataframe(data_file)  # Load the data into a DataFrame
+
+# Check if the data was successfully loaded before proceeding
+if df is not None:
+   
+    # Plot the graph for "fecal" data
+    plot_fecal_graph(df)
+    
+    # Plot the graph for "cecal" data
+    data_cecal = df[df["sample_type"] == "cecal"]  # Filter the data for the "cecal" sample type
+    plot_cecal_ileal_graph(data_cecal, "Cecal live bacteria", "graph_cecal.png")
+    
+    # Plot the graph for "ileal" data
+    data_ileal = df[df["sample_type"] == "ileal"]  # Filter the data for the "ileal" sample type
+    plot_cecal_ileal_graph(data_ileal, "Ileal live bacteria", "graph_ileal.png")
