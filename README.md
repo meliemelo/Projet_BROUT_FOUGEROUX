@@ -43,8 +43,7 @@ Vos graphiques seront enregistrés dans le dossier images avec les noms suivants
 •	images/graph_ileal.png : Graphique en violon des données iléales.
 2. Statistiques descriptives :
 Les statistiques descriptives ne sont pas explicitement sauvegardées sous forme de fichier dans le code actuel. Cependant, vous pouvez les calculer manuellement avec les outils intégrés de Pandas après avoir chargé les données :
-•	Exemple pour obtenir les statistiques de synthèse dans un tableau Pandas 
-# Calculer les statistiques de synthèse groupées
+•	Exemple pour obtenir les statistiques de synthèse dans un tableau Pandas:
 summary = df.groupby(["treatment", "sample_type"]).agg(
     moyenne=('counts_live_bacteria_per_wet_g', 'mean'),
     ecart_type=('counts_live_bacteria_per_wet_g', 'std'),
